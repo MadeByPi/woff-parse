@@ -28,44 +28,42 @@ THE SOFTWARE.
 
 package;
 
-import nme.errors.Error;
-import nme.utils.ByteArray;
-import nme.utils.CompressionAlgorithm;
-import nme.utils.Endian;
-import nme.Vector;
+import openfl.utils.Endian;
+import openfl.utils.ByteArray;
 
 /**
- * HaXe WOFF (web-open-font-format) parser
- * Converted and updated my earlier AS3 WOFF parser: blog.madebypi.co.uk/2009/11/09/as3-woff-parser/
+ * Haxe WOFF (web-open-font-format) parser
+ * Converted and updated my earlier AS3 WOFF parser
  *
  * Based on the following WOFF file-format reference http://people.mozilla.org/~jkew/woff/woff-2009-09-16.html
+ * TODO: investigate WOFF 2.0 spec (currently in draft)
  */
+
 class WOFFParser {
 	
-	private var woffBytes	:ByteArray;
+	var woffBytes			:ByteArray;
+	
 	public var header		:WOFFHeader;
-	public var tables		:Vector<WOFFTable>;
+	public var tables		:Array<WOFFTable>;
 	public var metadata		:WOFFMetadata;
 	public var privateData	:ByteArray;
 	
-	public function new() {
-		
-	}
+	public function new() { }
 	
-	public function parse(woffBytes:ByteArray):Void {
+	public function parse(woffBytes:ByteArray) {
 		
 		if (woffBytes == null) {
-			throw new Error("woffBytes was null!");
+			throw "woffBytes was null!";
 			return;
 		}
 		
-		this.woffBytes 		= woffBytes;
-		woffBytes.endian 	= Endian.BIG_ENDIAN;
+		this.woffBytes = woffBytes;
+		woffBytes.endian = Endian.BIG_ENDIAN;
 		
 		// parse WOFF header
 		header 	= new WOFFHeader(woffBytes);
-		// create a vector to store the tables
-		tables 	= new Vector<WOFFTable>();
+		// create a Array to store the tables
+		tables 	= new Array<WOFFTable>();
 		
 		// Knowing the header information we can parse and build font tables.
 		// With the woffBytes.position pointer in the right place after reading the header
@@ -92,21 +90,26 @@ class WOFFParser {
 		}
 	}
 	
-	public function isValid():Bool { return header != null && header.valid; }
-	public function hasMetadata():Bool { return metadata.data != null; }
-	public function hasPrivateData():Bool { return privateData != null; }
 	
-	public function numTables():Int { return tables.length; }
-	public function getTableAt(index:Int):WOFFTable { return tables[index]; }
+	public var isValid(get, never):Bool;
+	inline function get_isValid():Bool return header != null && header.valid;
+	
+	public var hasMetadata(get, never):Bool;
+	inline function get_hasMetadata():Bool return metadata.data != null;
+	
+	public var hasPrivateData(get, never):Bool;
+	inline function get_hasPrivateData():Bool return privateData != null;
+	
+	public var numTables(get, never):Int;
+	inline function get_numTables():Int return tables.length;
+	
+	public function getTableAt(index:Int):WOFFTable return tables[index];
 }
 
 
-/**
- *
- */
 class WOFFHeader {
+	
 	/*
-	WOFFHeader
 	UInt32	signature	0x774F4646 'wOFF'
 	UInt32	flavor	The "sfnt version" of the original file: 0x00010000 for TrueType flavored fonts or 0x4F54544F 'OTTO' for CFF flavored fonts.
 	UInt32	length	Total size of the WOFF file.
@@ -122,8 +125,8 @@ class WOFFHeader {
 	UInt32	privLength	Length of private data block; zero if no private data block is present.
 	*/
 
-	private static var SFNT_VERSION_TTF	:Int = 0x00010000;
-	private static var SFNT_VERSION_CFF	:Int = 0x4F54544F;
+	static var SFNT_VERSION_TTF	:Int = 0x00010000;
+	static var SFNT_VERSION_CFF	:Int = 0x4F54544F;
 	
 	public var valid			:Bool;
 	
@@ -145,24 +148,26 @@ class WOFFHeader {
 		valid = false;
 		
 		// check signature
-		if ( bytes.readUTFBytes(4) != "wOFF") {
-			throw new Error("Not a valid WOFF file, invalid signature");
+		var signature = bytes.readUTFBytes(4);
+		if (signature != "wOFF") {
+			trace(bytes);
+			throw 'Not a valid WOFF file, invalid signature: $signature';
 			return;
 		}
 		
-		sfntVersion 	= bytes.readUnsignedInt();
-		woffLength 		= bytes.readUnsignedInt();
-		numTables 		= bytes.readShort();
+		sfntVersion = bytes.readUnsignedInt();
+		woffLength = bytes.readUnsignedInt();
+		numTables = bytes.readShort();
 		
 		// check version
 		if (sfntVersion != SFNT_VERSION_TTF && sfntVersion != SFNT_VERSION_CFF) {
-			throw new Error("Not a valid WOFF file, invalid sfntVersion");
+			throw "Not a valid WOFF file, invalid sfntVersion";
 			return;
 		}
 		
 		// check reserved
 		if (bytes.readShort() != 0) {
-			throw new Error("Not a valid WOFF file, reserved data was not zero");
+			throw "Not a valid WOFF file, reserved data was not zero";
 			return;
 		}
 		
@@ -177,27 +182,24 @@ class WOFFHeader {
 		valid 			= true;
 	}
 	
-	
-	public function sfntVersionString():String {
-		return sfntVersion == SFNT_VERSION_CFF ? "cff" : "ttf";
-	}
+	inline function sfntVersionString():String return sfntVersion == SFNT_VERSION_CFF ? "cff" : "ttf";
 	
 	public function toString():String {
-		return valid ? (
-			"[WOFFHeader] " 	+
-			"sfntVersion:" 		+ sfntVersion + " (" + sfntVersionString() + "), " +
-			"woffLength:" 		+ woffLength + ", " +
-			"numTables:" 		+ numTables + ", " +
-			"totalSfntSize:" 	+ totalSfntSize + ", " +
-			"majorVersion:" 	+ majorVersion + ", " +
-			"minorVersion:" 	+ minorVersion + ", " +
-			"metaOffset:" 		+ metaOffset + ", " +
-			"metaLength:" 		+ metaLength + ", " +
-			"metaOrigLength:" 	+ metaOrigLength + ", " +
-			"privOffset:" 		+ privateOffset + ", " +
-			"privateLength:" 	+ privateLength)
-			
-			: "[WOFFHeader] [ERROR] Not a valid WOFF file :(";
+		return valid ? 
+		(
+			'[WOFFHeader] ' +
+			'sfntVersion: ${StringTools.hex(sfntVersion)} (${sfntVersionString()}), ' +
+			'woffLength: $woffLength, ' +
+			'numTables: $numTables, ' +
+			'totalSfntSize: $totalSfntSize, ' +
+			'majorVersion: $majorVersion, ' +
+			'minorVersion: $minorVersion, ' +
+			'metaOffset: $metaOffset, ' +
+			'metaLength: $metaLength, ' +
+			'metaOrigLength: $metaOrigLength, ' +
+			'privOffset: $privateOffset, ' +
+			'privateLength: $privateLength'
+		) : '[WOFFHeader] [ERROR] Not a valid WOFF file :(';
 	}
 }
 
@@ -228,7 +230,7 @@ class WOFFTable {
 	public var origChecksum			:Int;
 	
 	// sfnt-based font table data (ttf or cff)
-	private var _data				:ByteArray;
+	var _data						:ByteArray;
 	
 	public function new(bytes:ByteArray) {
 		// read the current header
@@ -245,26 +247,21 @@ class WOFFTable {
 		_data.position = 0;
 		
 		// if compressed, uncompress
-		if (compressed) _data.uncompress(); // ByteArray uncompress not available in JS...
+		if (compressed) _data.uncompress();
 		
 		if (cast(_data.length, Int) != origLength) { // Flash target needs a cast here
 			// TODO: Calcualte + Validate the checksum (is it just a CRC?) of the decompressed data against the embedded .origChecksum value
-			throw new Error("Uncompressed size does not match the original size, table data is probably corrupt");
+			throw "Uncompressed size does not match the original size, table data is probably corrupt";
 		}
 	}
 	
-	// get compressed
-	public var compressed(getIsCompressed, never):Bool;
-	private function getIsCompressed():Bool { return origLength != compLength; }
+	public var compressed(get, never):Bool;
+	inline function get_compressed():Bool return origLength != compLength;
 	
-	// get data
-	public var data(getData, never)	:ByteArray;
-	private function getData()		:ByteArray { return _data; }
+	public var data(get, never):ByteArray;
+	inline function get_data():ByteArray return _data;
 	
-	
-	public function toString():String {
-		return "[WOFFTable] tag:" + tag + ", compLength:" + compLength + ", origLength:" + origLength;
-	}
+	public function toString():String return '[WOFFTable] tag:$tag, compLength:$compLength, origLength:$origLength';
 }
 
 
@@ -282,11 +279,11 @@ class WOFFMetadata {
 	public var licenceId		:String;
 	public var licenceUrl		:String;
 	
-	public var licenseText		:Vector<Xml>;
-	public var copyrightText	:Vector<Xml>;
-	public var descriptionText	:Vector<Xml>;
-	public var trademarkText	:Vector<Xml>;
-	public var credits			:Vector<WOFFCredit>;
+	public var licenseText		:Array<Xml>;
+	public var copyrightText	:Array<Xml>;
+	public var descriptionText	:Array<Xml>;
+	public var trademarkText	:Array<Xml>;
+	public var credits			:Array<WOFFCredit>;
 	
 	public function new(bytes:ByteArray, offset:Int, length:Int) {
 		
@@ -298,7 +295,7 @@ class WOFFMetadata {
 		
 		try {
 			data = Xml.parse(b.readUTFBytes(b.length)).firstElement();
-		} catch (err:Error) {
+		} catch (err:Dynamic) {
 			trace("Error parsing WOFF meta xml");
 			trace(err);
 			return;
@@ -309,8 +306,6 @@ class WOFFMetadata {
 		var creditNodes:Iterator<Xml> = null;
 		
 		for ( elt in data.elements() ) {
-			
-			//trace("nodeName: " + elt.nodeName);
 			
 			switch(elt.nodeName) {
 				case "uniqueid"		: uniqueid 			= elt.get("id");
@@ -331,15 +326,14 @@ class WOFFMetadata {
 		}
 		
 		if (creditNodes != null) {
-			credits = new Vector<WOFFCredit>();
+			credits = new Array<WOFFCredit>();
 			while (creditNodes.hasNext()) credits.push(new WOFFCredit(creditNodes.next()));
 		}
 	}
 	
-	private function nodeIteratorToArray(nodes:Iterator<Xml>):Vector<Xml> {
+	function nodeIteratorToArray(nodes:Iterator<Xml>):Array<Xml> {
 		if (!nodes.hasNext()) return null;
-		
-		var out:Vector<Xml> = new Vector<Xml>();
+		var out:Array<Xml> = new Array<Xml>();
 		for (node in nodes) out.push(node);
 		return out;
 	}
@@ -347,16 +341,15 @@ class WOFFMetadata {
 	
 	public function toString():String {
 		return (data != null) ? (
-			"[WOFFMetadata]\n" 				+
-			"\tmetadataVersion: " 			+ metadataVersion + ", \n" +
-			"\tuniqueid: " 					+ uniqueid + ", \n" +
-			"\tvendorName: " 				+ vendorName + ", \n" +
-			"\tdescription languages: ["	+ availableLanguages(descriptionText) + "], \n" +
-			"\tlicense languages: [" 		+ availableLanguages(licenseText) + "], \n" +
-			"\tcopyright languages: [" 		+ availableLanguages(copyrightText) + "], \n" +
-			"\tcredits: " 					+ credits)
-			
-			: "[WOFFMetadata] No WOFF Metadata present";
+			'[WOFFMetadata]\n' +
+			'\tmetadataVersion: $metadataVersion,\n' +
+			'\tuniqueid: $uniqueid,\n' +
+			'\tvendorName: $vendorName,\n' +
+			'\tdescription languages: [${availableLanguages(descriptionText)}],\n' +
+			'\tlicense languages: [${availableLanguages(licenseText)}],\n' +
+			'\tcopyright languages: [${availableLanguages(copyrightText)}],\n' +
+			'\tcredits:$credits'
+			) : '[WOFFMetadata] No WOFF Metadata present';
 	}
 	
 	public function getDescriptionText(languageCode:String = "en"):String {
@@ -371,15 +364,15 @@ class WOFFMetadata {
 		return copyrightText == null ? null : getTextForLanguage(copyrightText, languageCode);
 	}
 	
-	public function availableLanguages(nodes:Vector<Xml>):Vector<String> {
+	public function availableLanguages(nodes:Array<Xml>):Array<String> {
 		if (null==nodes) return null;
 		
-		var out = new Vector<String>();
+		var out = new Array<String>();
 		for (node in nodes) out.push(node.get("lang"));
 		return out;
 	}
 	
-	private function getTextForLanguage(nodes:Vector<Xml>, languageCode:String):String {
+	function getTextForLanguage(nodes:Array<Xml>, languageCode:String):String {
 		for (node in nodes) {
 			if (node.get("lang") == languageCode) return node.firstChild().toString();
 		}
@@ -391,7 +384,7 @@ class WOFFMetadata {
  /**
   *
   */
- class WOFFCredit {
+class WOFFCredit {
 	
 	public var name	:String;
 	public var role	:String;
@@ -403,10 +396,5 @@ class WOFFMetadata {
 		url		= data.get("url");
 	}
 	
-	public function toString():String {
-		return 	"[WOFFCredit]" +
-				" name: " + name +
-				", role: " + role +
-				", url: " + url;
-	}
+	public function toString():String return '[WOFFCredit] name:$name, role:$role, url:$url';
  }
